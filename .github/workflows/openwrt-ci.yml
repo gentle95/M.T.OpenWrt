@@ -8,10 +8,13 @@
 name: OpenWrt-CI
 
 on:
-  schedule:
-    - cron: 0 20 * * *
-  release:
-    types: [published]
+  push:
+    branches: 
+      - master
+  #schedule:
+  #  - cron: 0 20 * * *
+  #release:
+  #  types: [published]
 
 jobs:
 
@@ -44,6 +47,13 @@ jobs:
 
           df -h
 
+      - name: MT ServerChan Helloworld
+        run: |
+          cd package
+          mkdir openwrt-packages
+          cd openwrt-packages
+          git clone https://github.com/tty228/luci-app-serverchan.git          
+      
       - name: Update feeds
         run: |
           sed -i 's/#src-git helloworld/src-git helloworld/g' ./feeds.conf.default
@@ -51,7 +61,118 @@ jobs:
           ./scripts/feeds install -a
 
       - name: Generate configuration file
-        run: make defconfig
+        run:  |
+          rm -f ./.config*
+          touch ./.config
+          #
+          # ========================固件定制部分========================
+          # 
+          # 固件压缩:
+          cat >> .config <<EOF
+          CONFIG_TARGET_IMAGES_GZIP=y
+          EOF
+          # 编译UEFI固件:
+          cat >> .config <<EOF
+          CONFIG_GRUB_EFI_IMAGES=y
+          EOF
+          # IPv6支持:
+          cat >> .config <<EOF
+          CONFIG_PACKAGE_dnsmasq_full_dhcpv6=y
+          CONFIG_PACKAGE_ipv6helper=y
+          EOF
+          
+          # 禁用samba:
+          cat >> .config <<EOF
+          # CONFIG_PACKAGE_autosamba is not set
+          EOF
+          # 多文件系统支持:
+          cat >> .config <<EOF
+          CONFIG_PACKAGE_kmod-fs-nfs=y
+          CONFIG_PACKAGE_kmod-fs-nfs-common=y
+          CONFIG_PACKAGE_kmod-fs-nfs-v3=y
+          CONFIG_PACKAGE_kmod-fs-nfs-v4=y
+          CONFIG_PACKAGE_kmod-fs-ntfs=y
+          CONFIG_PACKAGE_kmod-fs-squashfs=y
+          EOF
+          # USB3.0支持:
+          cat >> .config <<EOF
+          CONFIG_PACKAGE_kmod-usb-ohci=y
+          CONFIG_PACKAGE_kmod-usb-ohci-pci=y
+          CONFIG_PACKAGE_kmod-usb2=y
+          CONFIG_PACKAGE_kmod-usb2-pci=y
+          CONFIG_PACKAGE_kmod-usb3=y
+          EOF
+          # 常用LuCI插件选择:
+          cat >> .config <<EOF
+          CONFIG_PACKAGE_luci-app-ahcp=y
+          # CONFIG_PACKAGE_luci-app-amule is not set
+          # CONFIG_PACKAGE_luci-app-airplay2 is not set
+          # CONFIG_PACKAGE_luci-app-ipsec-vpnd is not set
+          CONFIG_PACKAGE_luci-app-mwan3=y
+          CONFIG_PACKAGE_luci-app-mwan3helper=y
+          # CONFIG_PACKAGE_luci-app-samba is not set
+          CONFIG_PACKAGE_luci-app-samba4=y
+          CONFIG_PACKAGE_luci-app-serverchan=y
+          CONFIG_PACKAGE_luci-app-udpxy=y
+          # CONFIG_PACKAGE_luci-app-vsftpd is not set
+          CONFIG_PACKAGE_luci-app-wrtbwmon=y
+          CONFIG_PACKAGE_luci-app-netdata=y
+          CONFIG_PACKAGE_luci-app-jd-dailybonus=y
+          # CONFIG_PACKAGE_luci-app-xlnetacc is not set
+          # CONFIG_PACKAGE_luci-app-zerotier is not set
+          # CONFIG_PACKAGE_luci-app-uugamebooster is not set
+          EOF
+          # LuCI主题:
+          cat >> .config <<EOF
+          CONFIG_PACKAGE_luci-theme-argon=y
+          CONFIG_PACKAGE_luci-theme-bootstrap=y
+          CONFIG_PACKAGE_luci-theme-freifunk-generic=y
+          CONFIG_PACKAGE_luci-theme-material=y
+          CONFIG_PACKAGE_luci-theme-netgear=y
+          # EOF
+          # 常用软件包:
+          cat >> .config <<EOF
+          CONFIG_PACKAGE_curl=y
+          CONFIG_PACKAGE_htop=y
+          CONFIG_PACKAGE_nano=y
+          CONFIG_PACKAGE_screen=y
+          CONFIG_PACKAGE_tree=y
+          CONFIG_PACKAGE_vim-fuller=y
+          CONFIG_PACKAGE_wget=y
+          CONFIG_PACKAGE_cfdisk=y
+          CONFIG_PACKAGE_lsblk=y
+          EOF
+          # 取消编译VMware镜像以及镜像填充 (不要删除被缩进的注释符号):
+          cat >> .config <<EOF
+          # CONFIG_VMDK_IMAGES is not set   
+          # EOF
+          
+          # 虚拟机:
+          cat >> .config <<EOF
+          # CONFIG_PACKAGE_qemu-arm-softmmu is not set
+          CONFIG_PACKAGE_qemu-bridge-helper=y
+          CONFIG_PACKAGE_qemu-firmware-efi=y
+          CONFIG_PACKAGE_qemu-firmware-pxe=y
+          CONFIG_PACKAGE_qemu-firmware-seabios=y
+          CONFIG_PACKAGE_qemu-firmware-seavgabios=y
+          CONFIG_PACKAGE_qemu-ga=y
+          # CONFIG_PACKAGE_qemu-img is not set
+          CONFIG_PACKAGE_qemu-keymaps=y
+          # CONFIG_PACKAGE_qemu-nbd is not set
+          CONFIG_PACKAGE_qemu-x86_64-softmmu=y
+          CONFIG_QEMU_UI_VNC=y
+          # CONFIG_QEMU_UI_VNC_JPEG is not set
+          # CONFIG_QEMU_UI_VNC_PNG is not set
+          # CONFIG_QEMU_UI_VNC_SASL is not set
+          # CONFIG_QEMU_UI_SPICE is not set
+          CONFIG_PACKAGE_virtio-console-helper=y
+          EOF
+          
+          # 
+          # ========================固件定制部分结束========================
+          # 
+          sed -i 's/^[ \t]*//g' ./.config
+          make defconfig
 
       - name: Make download
         run: |
